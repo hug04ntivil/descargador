@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { Downloader, DEFAULT_SETTINGS, formatArgs, isSingleVideoUrl } = require('../src/core');
+const { Downloader, DEFAULT_SETTINGS, formatArgs, isSingleVideoUrl, friendlyError, unwrapRedirect } = require('../src/core');
 
 const URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
 const out = fs.mkdtempSync(path.join(os.tmpdir(), 'descargador-test-'));
@@ -45,6 +45,17 @@ async function run(format) {
   assert.ok(isSingleVideoUrl('https://www.youtube.com/watch?v=abc&list=PL1'));
   assert.ok(!isSingleVideoUrl('https://www.youtube.com/playlist?list=PL1'));
   assert.ok(formatArgs('720').join(' ').includes('height<=720'));
+
+  // Facebook: mensaje claro y enlaces envueltos en l.facebook.com
+  assert.ok(/Facebook/.test(friendlyError('1022555381530004: Cannot parse data; please report this issue on https://github.com/yt-dlp')));
+  assert.ok(/cookies/i.test(friendlyError('This video is only available for registered users')));
+  assert.strictEqual(
+    unwrapRedirect('https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.facebook.com%2Fwatch%2F%3Fv%3D10153231379946729&h=AT0abc'),
+    'https://www.facebook.com/watch/?v=10153231379946729',
+  );
+  assert.strictEqual(unwrapRedirect('https://lm.facebook.com/l.php?u=https%3A%2F%2Fyoutu.be%2Fabc'), 'https://youtu.be/abc');
+  assert.strictEqual(unwrapRedirect('https://www.facebook.com/watch/?v=1'), 'https://www.facebook.com/watch/?v=1');
+  assert.strictEqual(unwrapRedirect('https://l.facebook.com/l.php?u=javascript:alert(1)'), 'https://l.facebook.com/l.php?u=javascript:alert(1)');
 
   await run('360');
   await run('mp3');
@@ -106,6 +117,19 @@ async function run(format) {
   assert.ok(all.list().length >= 5, 'toda la lista añadida');
   all.pauseAll();
   console.log(`OK lista completa (${all.list().length} videos)`);
+
+  // En segundo plano (app minimizada) un video dentro de una lista no pregunta: baja solo ese video y avisa
+  const bg = mk({ playlists: 'ask' });
+  let asked = false;
+  let announced = null;
+  bg.on('choose', () => { asked = true; });
+  bg.on('added', (a) => { announced = a; });
+  const rb = await bg.add(LIST, '360', { background: true, announce: true });
+  assert.ok(rb.ok && !rb.choose && !asked, 'en segundo plano no se pregunta');
+  assert.strictEqual(bg.list().length, 1, 'solo el video del enlace');
+  assert.ok(announced && announced.count === 1, 'se anuncia el video añadido');
+  bg.pauseAll();
+  console.log('OK segundo plano: video de una lista sin preguntar');
 
   const badDl = mk({});
   await badDl.add('https://www.instagram.com/reel/C0000000000/', 'best');

@@ -6,7 +6,8 @@ Aplicación de escritorio para Windows (uso privado) para descargar videos y aud
 - Cola de descargas con miniatura, progreso, velocidad y tiempo restante.
 - Pegar enlaces (`Ctrl+V`), arrastrarlos a la ventana o copiarlos: se añaden solos desde el portapapeles.
 - Listas de reproducción y canales: al añadir un enlace con varios videos se abre un selector (marcar/desmarcar, filtrar por título, "Solo el video del enlace"). En Preferencias se puede elegir "descargar la lista completa" o "solo el video del enlace" sin preguntar. Los videos van a una subcarpeta con el nombre de la lista.
-- Instagram, TikTok, X, Facebook, Twitch, Reddit y más: se pegan o copian igual que YouTube. Si el sitio exige sesión, usa las cookies del navegador (Firefox funciona mejor) o un archivo cookies.txt en Preferencias.
+- **Segundo plano**: con la ventana minimizada el portapapeles sigue funcionando y la descarga empieza sola. Un video dentro de una lista (`&list=...`) baja solo ese video, sin esperar una elección; una playlist completa avisa y espera tu decisión. Windows muestra avisos cuando la descarga inicia o termina y cuando un enlace no se pudo añadir.
+- **Facebook**, Instagram, TikTok, X, Twitch, Reddit y más: se pegan o copian igual que YouTube (también los enlaces `l.facebook.com/l.php?u=...` que salen de Messenger). Los videos públicos de Facebook bajan sin iniciar sesión; los privados, de grupos o con restricción necesitan las cookies del navegador (Firefox funciona mejor) o un archivo cookies.txt en Preferencias.
 - Calidades: mejor, 4K, 1440p, 1080p, 720p, 480p, 360p; solo audio MP3 o M4A; original sin conversión (MKV).
 - Pausar/reanudar, reintentar, descargas simultáneas, límite de velocidad, proxy, cookies del navegador.
 - Subtítulos, metadatos y miniatura incrustados (opcional).

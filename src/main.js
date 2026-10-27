@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Notification, Menu, net } = 
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { Downloader, FORMATS, DEFAULT_SETTINGS } = require('./core');
+const { Downloader, FORMATS, DEFAULT_SETTINGS, unwrapRedirect } = require('./core');
 const { watchClipboard } = require('./clipwatch');
 const { Updater } = require('./updater');
 const pkg = require('../package.json');
@@ -57,7 +57,31 @@ function send(channel, payload) {
 // Saca los enlaces de un texto; quita signos que suelen pegarse al final al copiar de un mensaje.
 function extractUrls(text) {
   const found = String(text || '').match(/https?:\/\/[^\s<>"']+/gi) || [];
-  return [...new Set(found.map((u) => u.replace(/[)\].,;:!?]+$/, '')))];
+  return [...new Set(found.map((u) => unwrapRedirect(u.replace(/[)\].,;:!?]+$/, ''))))];
+}
+
+// ¿El usuario no está mirando la app? (minimizada, oculta o en segundo plano)
+function windowHidden() {
+  return !win || win.isDestroyed() || win.isMinimized() || !win.isVisible() || !win.isFocused();
+}
+
+// Aviso de Windows: sirve para saber qué pasó con lo copiado cuando la ventana no se ve.
+const liveNotifications = new Set();
+function osNotify(title, body, onClick) {
+  if (SELFTEST && SELFTEST.debug) fs.appendFileSync(`${SELFTEST.shot}.notifs.log`, `${title} | ${body}\n`);
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body });
+  liveNotifications.add(n); // evita que se recoja antes de poder pulsarla
+  n.on('click', () => { liveNotifications.delete(n); if (onClick) onClick(); });
+  n.on('close', () => liveNotifications.delete(n));
+  n.show();
+}
+
+function showWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
 }
 
 // ---------- actualizaciones de la app (Releases de GitHub) ----------
@@ -120,24 +144,23 @@ function createDownloader() {
   downloader.on('update', (item) => { pending.set(item.id, item); queueFlush(); scheduleQueueSave(); });
   downloader.on('remove', (id) => { pending.delete(id); send('items:remove', id); queueFlush(); scheduleQueueSave(); });
   downloader.on('stats', queueFlush);
-  downloader.on('notice', (n) => send('notice', n));
+  downloader.on('notice', (n) => {
+    send('notice', n);
+    // Con la ventana minimizada el aviso interno no se ve: se repite como aviso de Windows.
+    if (n.type === 'error' && windowHidden()) osNotify('No se pudo añadir el enlace', n.text, showWindow);
+  });
+  downloader.on('added', ({ title, count }) => {
+    if (windowHidden()) osNotify('Descarga iniciada', count > 1 ? `${count} videos de «${title}»` : title, showWindow);
+  });
   downloader.on('choose', (choice) => {
     send('choose', choice);
-    if (win && !win.isDestroyed() && !win.isFocused()) {
-      win.flashFrame(true);
-      if (Notification.isSupported()) {
-        const n = new Notification({ title: 'Lista detectada', body: `Elige qué videos descargar de «${choice.title}»` });
-        n.on('click', () => { win.show(); win.focus(); });
-        n.show();
-      }
+    if (windowHidden()) {
+      if (win && !win.isDestroyed()) win.flashFrame(true);
+      osNotify('Lista detectada', `Elige qué videos descargar de «${choice.title}»`, showWindow);
     }
   });
   downloader.on('done', (item) => {
-    if (Notification.isSupported() && !(win && win.isFocused())) {
-      const n = new Notification({ title: 'Descarga completada', body: item.title });
-      n.on('click', () => shell.showItemInFolder(item.filepath));
-      n.show();
-    }
+    if (windowHidden()) osNotify('Descarga completada', item.title, () => shell.showItemInFolder(item.filepath));
   });
 }
 
@@ -145,7 +168,11 @@ function startClipboardWatch() {
   clipWatcher = watchClipboard((text) => {
     for (const u of extractUrls(text)) {
       try {
-        if (WATCH_HOSTS.test(new URL(u).hostname)) downloader.add(u, settings.defaultFormat, { silentFail: true });
+        if (WATCH_HOSTS.test(new URL(u).hostname)) {
+          // background: con la ventana minimizada no se puede responder a ninguna pregunta, así que un video
+          // dentro de una lista (&list=...) baja solo ese video en lugar de esperar una elección.
+          downloader.add(u, settings.defaultFormat, { silentFail: true, background: windowHidden(), announce: true });
+        }
       } catch { /* URL inválida */ }
     }
   }, () => settings.clipboardWatch);
@@ -234,6 +261,7 @@ function createWindow() {
 async function runSelftest() {
   await new Promise((r) => win.webContents.once('did-finish-load', r));
   await new Promise((r) => setTimeout(r, 800));
+  if (SELFTEST.minimize) win.minimize();
   if (SELFTEST.checkUpdate) checkForUpdate(true);
   for (const u of SELFTEST.urls || []) downloader.add(u, SELFTEST.format || 'best');
   await new Promise((r) => setTimeout(r, SELFTEST.waitMs || 6000));

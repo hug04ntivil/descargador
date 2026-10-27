@@ -36,8 +36,9 @@ Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; Gr
 Source: "..\out\Descargador-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+; AppUserModelID: Windows lo necesita para mostrar las notificaciones de la app (cl.hugo.descargador, el mismo de main.js).
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "cl.hugo.descargador"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon; AppUserModelID: "cl.hugo.descargador"
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Abrir {#AppName}"; Flags: nowait postinstall skipifsilent

@@ -20,7 +20,7 @@
   </header>
 
   <section class="addbar">
-    <input id="url" type="text" placeholder="Pega aquí un enlace (YouTube, Vimeo, SoundCloud…) o varios separados por espacio" spellcheck="false" autocomplete="off">
+    <input id="url" type="text" placeholder="Pega aquí un enlace (YouTube, Facebook, Instagram, TikTok, X…) o varios separados por espacio" spellcheck="false" autocomplete="off">
     <select id="format" aria-label="Formato"></select>
     <button id="btn-paste" class="android-only" type="button">Pegar</button>
     <button id="btn-add" class="primary">Añadir</button>
@@ -39,7 +39,7 @@
     <div id="empty" class="empty">
       <svg viewBox="0 0 24 24" width="56" height="56"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-8 15a1 1 0 0 1 1 1v1h14v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
       <h2>Aún no hay descargas</h2>
-      <p class="desktop-only">Pega un enlace con <kbd>Ctrl</kbd>+<kbd>V</kbd>, arrástralo a esta ventana o simplemente cópialo:<br>los enlaces de video copiados se añaden solos.</p>
+      <p class="desktop-only">Pega un enlace con <kbd>Ctrl</kbd>+<kbd>V</kbd>, arrástralo a esta ventana o simplemente cópialo:<br>los enlaces de video copiados se añaden solos, incluso con la ventana minimizada.<br>Funciona con YouTube, Facebook, Instagram, TikTok, X, Vimeo, Twitch, Reddit y muchos más.</p>
       <p class="android-only">En YouTube, Instagram, TikTok, X o tu navegador usa <b>Compartir → Descargador</b>.<br>También puedes copiar un enlace y abrir esta app, o pulsar <b>Pegar</b>.</p>
     </div>
   </main>
@@ -84,7 +84,7 @@
         <input id="s-proxy" type="text" placeholder="ninguno">
       </label>
       <label class="row desktop-only">
-        <span>Usar cookies del navegador <small>(videos con edad restringida o privados)</small></span>
+        <span>Usar cookies del navegador <small>(Facebook, Instagram o X privados; videos con edad restringida)</small></span>
         <select id="s-cookies">
           <option value="">No usar</option>
           <option value="firefox">Firefox</option>
@@ -102,7 +102,7 @@
         </select>
       </label>
       <label class="row">
-        <span>Archivo cookies.txt <small>(Instagram, X, TikTok con sesión; tiene prioridad)</small></span>
+        <span>Archivo cookies.txt <small>(Facebook, Instagram, X, TikTok con sesión; tiene prioridad)</small></span>
         <div class="inline">
           <input id="s-cookiesfile" type="text" readonly placeholder="ninguno">
           <button type="button" id="s-cookiesfile-btn" class="ghost">Elegir…</button>

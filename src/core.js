@@ -102,6 +102,7 @@ function friendlyError(raw) {
     [/not a bot|confirm you.re not/i, 'YouTube pide comprobar que no eres un robot. En Preferencias activa las cookies del navegador.'],
     [/cookie database|decrypt|DPAPI|could not find .*cookies|cookies? (file|from browser)/i, 'No pude leer las cookies del navegador. Ciérralo, usa Firefox o un archivo cookies.txt (Preferencias).'],
     [/empty media response|login required|requires? (a )?login|log ?in|use --cookies|--cookies-from-browser|rate-limit|restricted video|age[- ]restricted|private (video|account)|protected tweet|NSFW/i, 'Requiere iniciar sesión. En Preferencias elige las cookies de tu navegador (Firefox funciona mejor) o un archivo cookies.txt.'],
+    [/Cannot parse data|Cannot find video|registered users/i, 'No pude leer ese video. Si es de Facebook o de una cuenta privada, necesita sesión: en Preferencias usa las cookies del navegador (Firefox) o un archivo cookies.txt. Si es público, prueba "Buscar actualización" de yt-dlp.'],
     [/No video could be found in this (tweet|post)|no video (formats )?found|does not contain (a )?video/i, 'Esta publicación no contiene video.'],
     [/IP address is blocked|geo.?restrict|not available in your country/i, 'El sitio bloquea tu región o IP para este contenido.'],
     [/Unsupported URL/i, 'Enlace no compatible.'],
@@ -247,6 +248,8 @@ class Downloader extends EventEmitter {
    * @param {{mode?:'auto'|'video'|'all', silentFail?:boolean}} opts
    *   mode: 'video' = solo el video del enlace, 'all' = toda la lista sin preguntar.
    *   silentFail: si el análisis falla, quita la fila y avisa con un aviso (portapapeles).
+   *   background: la app no se está mirando; no se hacen preguntas (un video de una lista baja solo el video).
+   *   announce: emite 'added' cuando el enlace ya se añadió a la cola (para avisar con una notificación).
    */
   async add(rawUrl, format, opts = {}) {
     const url = String(rawUrl || '').trim();
@@ -262,7 +265,8 @@ class Downloader extends EventEmitter {
     const { hasList, hasVideo } = urlKind(url);
     let mode = opts.mode || 'auto';
     if (mode === 'auto') {
-      if (hasList && hasVideo && settings.playlists === 'video') mode = 'video';
+      // En segundo plano (portapapeles con la app minimizada) no se puede preguntar: se baja solo el video.
+      if (hasList && hasVideo && (settings.playlists === 'video' || (opts.background && settings.playlists === 'ask'))) mode = 'video';
       else if (settings.playlists === 'all') mode = 'all';
     }
     const noPlaylist = hasVideo && (mode === 'video' || !hasList);
@@ -284,6 +288,7 @@ class Downloader extends EventEmitter {
         return { ok: true, choose: true };
       }
       this._materialize(placeholder, entries.map((e, i) => ({ e, i })), playlist, fromPlaylist);
+      if (opts.announce) this.emit('added', { title: placeholder.title, count: entries.length });
       if (entries.length > 1) this.emit('notice', { type: 'info', text: `Lista añadida: ${entries.length} videos` });
     } catch (e) {
       const friendly = friendlyError(e.message);
@@ -634,4 +639,17 @@ class Downloader extends EventEmitter {
   }
 }
 
-module.exports = { Downloader, FORMATS, DEFAULT_SETTINGS, formatArgs, isSingleVideoUrl, urlKind, videoIdOf, friendlyError, sanitizeDirName };
+// Los enlaces que se copian desde Facebook/Messenger suelen venir envueltos:
+// https://l.facebook.com/l.php?u=<enlace real>. Se devuelve el enlace real.
+function unwrapRedirect(u) {
+  try {
+    const url = new URL(u);
+    if (/^lm?\.facebook\.com$/i.test(url.hostname) && url.pathname.startsWith('/l.php')) {
+      const real = url.searchParams.get('u');
+      if (real && /^https?:\/\//i.test(real)) return real;
+    }
+  } catch { /* se deja tal cual */ }
+  return u;
+}
+
+module.exports = { Downloader, FORMATS, DEFAULT_SETTINGS, formatArgs, isSingleVideoUrl, urlKind, videoIdOf, friendlyError, sanitizeDirName, unwrapRedirect };

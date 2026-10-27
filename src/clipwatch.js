@@ -4,6 +4,14 @@
 // aunque el texto sea idéntico al anterior (p. ej. copiar de nuevo un enlace que ya se quitó).
 const { clipboard } = require('electron');
 
+// readText() podría quedarse esperando si otra aplicación tiene el portapapeles bloqueado;
+// sin este límite el vigilante se quedaría "ocupado" para siempre y dejaría de detectar enlaces.
+function readTextSafe(ms = 3000) {
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('portapapeles bloqueado')), ms); });
+  return Promise.race([clipboard.readText(), timeout]).finally(() => clearTimeout(timer));
+}
+
 function loadSequenceFn() {
   try {
     const koffi = require('koffi');
@@ -25,7 +33,7 @@ function watchClipboard(onText, isEnabled, intervalMs = 600) {
   let lastText = null;
   let busy = false;
 
-  if (!seq) clipboard.readText().then((t) => { lastText = t; }).catch(() => {});
+  if (!seq) readTextSafe().then((t) => { lastText = t; }).catch(() => {});
 
   const timer = setInterval(async () => {
     if (busy) return;
@@ -36,10 +44,10 @@ function watchClipboard(onText, isEnabled, intervalMs = 600) {
         if (s === lastSeq) return;
         lastSeq = s;
         if (!isEnabled()) return;
-        const text = await clipboard.readText();
+        const text = await readTextSafe();
         if (text) onText(text);
       } else {
-        const text = await clipboard.readText();
+        const text = await readTextSafe();
         if (text === lastText) return;
         lastText = text;
         if (text && isEnabled()) onText(text);
