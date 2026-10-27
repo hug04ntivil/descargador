@@ -1,7 +1,7 @@
 {
   "name": "descargador",
   "productName": "Descargador",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Descargador de videos y audio para Windows, basado en yt-dlp",
   "main": "src/main.js",
   "author": "Hugo",
