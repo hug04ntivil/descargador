@@ -1,0 +1,35 @@
+# Dependencias y compilados
+node_modules/
+out/
+installer/*.exe
+installer/*.apk
+
+# Binarios de terceros (yt-dlp.exe, ffmpeg.exe): se descargan, no se versionan
+bin/
+
+# Herramientas locales para compilar Android (JDK, SDK, Gradle, emulador)
+.android-tools/
+
+# Android: compilados y archivos locales
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+
+# SECRETOS: llave de firma de la app Android. Nunca deben subirse.
+android/keystore/
+android/keystore.properties
+android/*.jks
+android/*.keystore
+*.jks
+*.keystore
+.env
+.env.*
+
+# Varios
+.claude/
+graphify-out/
+*.log
+Thumbs.db
+.DS_Store

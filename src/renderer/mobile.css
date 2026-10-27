@@ -1,0 +1,37 @@
+/* Ajustes para pantallas estrechas y para la versión Android. */
+.android-only { display: none; }
+html.android .android-only { display: inline-block; }
+html.android p.android-only { display: block; }
+html.android .desktop-only { display: none !important; }
+html.android body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+html.android .title, html.android .status, html.android input[type=text] { -webkit-user-select: text; user-select: text; }
+
+dialog { max-height: 92vh; overflow-y: auto; }
+.item .thumb, .item .title { cursor: default; }
+.item[data-status=done] .thumb, .item[data-status=done] .title { cursor: pointer; }
+
+@media (max-width: 680px) {
+  .top { padding: 8px 12px; }
+  .addbar { flex-wrap: wrap; padding: 10px 12px; }
+  .addbar input { flex: 1 1 100%; }
+  .addbar select { flex: 1 1 0; min-width: 0; }
+  .addbar button { flex: 0 0 auto; }
+  input[type=text], input[type=number], select, button { min-height: 42px; }
+  .list { padding: 0 12px 8px; }
+  .item { display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; padding: 8px; align-items: start; }
+  .thumb { width: 96px; height: 54px; }
+  .btns { grid-column: 1 / -1; justify-content: flex-end; }
+  .btns .icon-btn { padding: 10px; min-height: 0; }
+  .bottom { flex-direction: column; align-items: stretch; padding: 8px 12px; gap: 8px; }
+  .actions { justify-content: stretch; }
+  .actions button { flex: 1 1 45%; padding: 8px 6px; }
+  .row { grid-template-columns: 1fr; gap: 6px; }
+  dialog { width: 94vw; padding: 16px; }
+  dialog.wide { width: 96vw; padding: 12px; }
+  .picker-head { flex-direction: column; align-items: stretch; }
+  .picker-tools { flex-wrap: wrap; }
+  .picker-tools input { flex: 1 1 100%; order: 3; }
+  .pk-row img { width: 64px; height: 36px; }
+  .toast { bottom: 150px; max-width: 90vw; text-align: center; }
+  .empty { margin-top: 6vh; padding: 0 12px; }
+}

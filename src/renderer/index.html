@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Descargador</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-8 15a1 1 0 0 1 1 1v1h14v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+      <span>Descargador</span>
+    </div>
+    <button id="btn-settings" class="icon-btn" title="Preferencias" aria-label="Preferencias">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.4 13a7.7 7.7 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.3 7.3 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4l-.4 2.6a7.3 7.3 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.6 8.8a.5.5 0 0 0 .1.6l2 1.6a7.7 7.7 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.2.4.5.4h3.8c.3 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6l-2-1.6ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>
+    </button>
+  </header>
+
+  <section class="addbar">
+    <input id="url" type="text" placeholder="Pega aquí un enlace (YouTube, Vimeo, SoundCloud…) o varios separados por espacio" spellcheck="false" autocomplete="off">
+    <select id="format" aria-label="Formato"></select>
+    <button id="btn-paste" class="android-only" type="button">Pegar</button>
+    <button id="btn-add" class="primary">Añadir</button>
+  </section>
+
+  <main id="list" class="list" aria-live="polite">
+    <div id="empty" class="empty">
+      <svg viewBox="0 0 24 24" width="56" height="56"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-8 15a1 1 0 0 1 1 1v1h14v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+      <h2>Aún no hay descargas</h2>
+      <p class="desktop-only">Pega un enlace con <kbd>Ctrl</kbd>+<kbd>V</kbd>, arrástralo a esta ventana o simplemente cópialo:<br>los enlaces de video copiados se añaden solos.</p>
+      <p class="android-only">En YouTube, Instagram, TikTok, X o tu navegador usa <b>Compartir → Descargador</b>.<br>También puedes copiar un enlace y abrir esta app, o pulsar <b>Pegar</b>.</p>
+    </div>
+  </main>
+
+  <footer class="bottom">
+    <div class="stats" id="stats">Sin actividad</div>
+    <div class="actions">
+      <button id="btn-pause-all" class="ghost">Pausar todo</button>
+      <button id="btn-resume-all" class="ghost">Reanudar todo</button>
+      <button id="btn-clear" class="ghost">Limpiar completados</button>
+      <button id="btn-folder" class="ghost">Abrir carpeta</button>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" role="status"></div>
+  <div id="drop" class="drop">Suelta el enlace para añadirlo</div>
+
+  <dialog id="settings">
+    <form method="dialog" id="settings-form">
+      <h2>Preferencias</h2>
+      <label class="row desktop-only">
+        <span>Carpeta de descargas</span>
+        <div class="inline">
+          <input id="s-dir" type="text" readonly>
+          <button type="button" id="s-dir-btn" class="ghost">Cambiar…</button>
+        </div>
+      </label>
+      <label class="row">
+        <span>Formato por defecto</span>
+        <select id="s-format"></select>
+      </label>
+      <label class="row">
+        <span>Descargas simultáneas</span>
+        <input id="s-max" type="number" min="1" max="8">
+      </label>
+      <label class="row">
+        <span>Límite de velocidad <small>(ej. 500K, 2M; vacío = sin límite)</small></span>
+        <input id="s-speed" type="text" placeholder="sin límite">
+      </label>
+      <label class="row">
+        <span>Proxy <small>(ej. http://127.0.0.1:8080)</small></span>
+        <input id="s-proxy" type="text" placeholder="ninguno">
+      </label>
+      <label class="row desktop-only">
+        <span>Usar cookies del navegador <small>(videos con edad restringida o privados)</small></span>
+        <select id="s-cookies">
+          <option value="">No usar</option>
+          <option value="firefox">Firefox</option>
+          <option value="edge">Edge</option>
+          <option value="chrome">Chrome</option>
+          <option value="brave">Brave</option>
+        </select>
+      </label>
+      <label class="row">
+        <span>Listas de reproducción <small>(enlaces con varios videos)</small></span>
+        <select id="s-playlists">
+          <option value="ask">Elegir qué videos descargar</option>
+          <option value="all">Descargar la lista completa</option>
+          <option value="video">Solo el video del enlace</option>
+        </select>
+      </label>
+      <label class="row">
+        <span>Archivo cookies.txt <small>(Instagram, X, TikTok con sesión; tiene prioridad)</small></span>
+        <div class="inline">
+          <input id="s-cookiesfile" type="text" readonly placeholder="ninguno">
+          <button type="button" id="s-cookiesfile-btn" class="ghost">Elegir…</button>
+          <button type="button" id="s-cookiesfile-clear" class="ghost" title="Quitar">✕</button>
+        </div>
+      </label>
+      <label class="check"><input id="s-clip" type="checkbox"> Añadir automáticamente los enlaces que copie</label>
+      <label class="check"><input id="s-meta" type="checkbox"> Incrustar metadatos (título, artista…)</label>
+      <label class="check"><input id="s-thumb" type="checkbox"> Incrustar miniatura como carátula</label>
+      <label class="check"><input id="s-subs" type="checkbox"> Descargar subtítulos
+        <input id="s-sublangs" type="text" class="mini" placeholder="es.*,en.*"></label>
+
+      <div class="ytdlp">
+        <span>yt-dlp <b id="ytv">…</b></span>
+        <button type="button" id="s-update" class="ghost">Buscar actualización</button>
+      </div>
+      <pre id="update-log" hidden></pre>
+
+      <menu>
+        <button value="cancel" class="ghost">Cancelar</button>
+        <button value="ok" id="s-save" class="primary">Guardar</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="picker" class="wide">
+    <div class="picker-head">
+      <div>
+        <h2 id="p-title">Lista de reproducción</h2>
+        <div id="p-sub" class="muted"></div>
+      </div>
+      <button type="button" id="p-single" class="ghost" hidden>Solo el video del enlace</button>
+    </div>
+    <div class="picker-tools">
+      <button type="button" id="p-all" class="ghost">Todos</button>
+      <button type="button" id="p-none" class="ghost">Ninguno</button>
+      <input id="p-filter" type="text" placeholder="Filtrar por título…" spellcheck="false">
+      <span id="p-count" class="muted"></span>
+    </div>
+    <div id="p-list" class="picker-list"></div>
+    <menu>
+      <button type="button" id="p-cancel" class="ghost">Descartar lista</button>
+      <button type="button" id="p-ok" class="primary">Descargar</button>
+    </menu>
+  </dialog>
+
+  <script src="platform.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
