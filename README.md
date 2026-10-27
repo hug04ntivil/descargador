@@ -58,7 +58,19 @@ powershell -File android\build-apk.ps1      # APKs firmados en installer\ (unive
 ```
 La interfaz web se comparte con el escritorio (`src/renderer`); solo `platform.js` cambia (puente Kotlin en vez de Electron).
 
+## macOS
+La misma app corre en macOS (Apple Silicon e Intel). Guía de instalación y diferencias en [GUIA-MAC.md](GUIA-MAC.md).
+Los DMG los construye GitHub Actions (`.github/workflows/mac.yml`) porque un Mac no se puede compilar ni firmar desde Windows:
+- Al publicar con `npm run release -- ...` se disparan solos y añaden `Descargador-<versión>-mac-arm64.dmg` y `-mac-x64.dmg` al release.
+- A mano: `gh workflow run mac.yml` (los DMG quedan como artefactos 14 días; con `-f tag=vX.Y.Z` también se suben a ese release).
+- En un Mac: `npm ci && npm run dist:mac`.
+- Cada ejecución prueba la app empaquetada de verdad en macOS: descarga un video, lo convierte a MP3 con ffmpeg y
+  comprueba que el vigilante del portapapeles detecta un enlace copiado (`test/smoke-packaged.js`, `test/smoke-clipboard.js`).
+- Sin cuenta de pago de Apple la app va firmada "ad-hoc" y no notarizada: la primera vez hay que abrirla con
+  clic derecho → Abrir (o "Abrir de todos modos" en Ajustes → Privacidad y seguridad).
+
 ## Notas
+- Los binarios incluidos (yt-dlp, ffmpeg) tienen sus propias licencias; ffmpeg se distribuye en builds estáticos (GPL).
 - El portapapeles se vigila con `GetClipboardSequenceNumber` (vía koffi) para detectar incluso una copia repetida del mismo enlace. En Electron 45 `clipboard.readText()` es asíncrono (devuelve una promesa).
 - El instalador es por usuario (no pide administrador), así yt-dlp puede actualizarse solo.
 - El solucionador de firmas de YouTube necesita un runtime JS: la app usa su propio Electron como Node (`ELECTRON_RUN_AS_NODE`), sin instalar nada más.
