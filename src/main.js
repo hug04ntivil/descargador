@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Notification, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Notification, Menu, net } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { Downloader, FORMATS, DEFAULT_SETTINGS } = require('./core');
 const { watchClipboard } = require('./clipwatch');
+const { Updater } = require('./updater');
+const pkg = require('../package.json');
 
 // Variables de autoprueba (solo para verificar la interfaz en desarrollo).
 const SELFTEST = process.env.DESCARGADOR_SELFTEST ? JSON.parse(process.env.DESCARGADOR_SELFTEST) : null;
@@ -55,6 +58,49 @@ function send(channel, payload) {
 function extractUrls(text) {
   const found = String(text || '').match(/https?:\/\/[^\s<>"']+/gi) || [];
   return [...new Set(found.map((u) => u.replace(/[)\].,;:!?]+$/, '')))];
+}
+
+// ---------- actualizaciones de la app (Releases de GitHub) ----------
+let updater = null;
+let updateDismissed = '';
+
+function repoFromPackage() {
+  const url = (pkg.repository && (pkg.repository.url || pkg.repository)) || '';
+  const m = /github\.com[/:]([^/]+\/[^/.]+)/.exec(String(url));
+  return m ? m[1] : 'hug04ntivil/descargador';
+}
+
+function createUpdater() {
+  // Las variables de prueba solo se respetan al ejecutar desde el código fuente, nunca en la app instalada.
+  const dev = !app.isPackaged;
+  const apiOverride = dev ? process.env.DESCARGADOR_UPDATE_API : '';
+  updater = new Updater({
+    currentVersion: app.getVersion(),
+    repo: repoFromPackage(),
+    apiUrl: apiOverride || undefined,
+    allowAnyHost: !!apiOverride,
+    fetchFn: (url, init) => net.fetch(url, init),
+    tempDir: path.join(app.getPath('temp'), 'Descargador-update'),
+    runInstaller: (file) => {
+      if (dev && process.env.DESCARGADOR_UPDATE_DRYRUN) return;
+      // El instalador cierra esta ventana, actualiza los archivos y vuelve a abrir la app (/RELAUNCH=1).
+      const child = spawn(file, ['/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', '/RELAUNCH=1'], { detached: true, stdio: 'ignore' });
+      child.unref();
+      setTimeout(() => app.quit(), 400);
+    },
+  });
+}
+
+async function checkForUpdate(manual) {
+  const r = await updater.check();
+  if (r.status === 'available' && (manual || r.latest !== updateDismissed)) send('update:available', r);
+  return r;
+}
+
+function scheduleUpdateChecks() {
+  const run = () => { if (settings.autoUpdateCheck !== false) checkForUpdate(false); };
+  setTimeout(run, 15000);
+  setInterval(run, 12 * 60 * 60 * 1000);
 }
 
 function createDownloader() {
@@ -113,11 +159,25 @@ function registerIpc() {
     formats: FORMATS,
     stats: downloader.stats(),
     ytdlpVersion: await downloader.version(),
+    appVersion: app.getVersion(),
   }));
   ipcMain.handle('add', (_e, text, format) => {
     const urls = extractUrls(text);
     urls.forEach((u) => downloader.add(u, format));
     return urls.length;
+  });
+  ipcMain.handle('app:check-update', () => checkForUpdate(true));
+  ipcMain.on('app:install-update', async () => {
+    try {
+      await updater.install((p) => send('update:progress', p));
+    } catch (e) {
+      send('update:error', e.message);
+    }
+  });
+  ipcMain.on('app:dismiss-update', (_e, version) => { updateDismissed = String(version || ''); });
+  ipcMain.on('app:open-release', () => {
+    const url = updater.pending && updater.pending.release.html_url;
+    if (url && url.startsWith(`https://github.com/${repoFromPackage()}/`)) shell.openExternal(url);
   });
   ipcMain.on('choice-confirm', (_e, id, indexes) => downloader.resolveChoice(id, Array.isArray(indexes) ? indexes : []));
   ipcMain.on('choice-single', (_e, id) => downloader.chooseSingle(id));
@@ -174,13 +234,14 @@ function createWindow() {
 async function runSelftest() {
   await new Promise((r) => win.webContents.once('did-finish-load', r));
   await new Promise((r) => setTimeout(r, 800));
+  if (SELFTEST.checkUpdate) checkForUpdate(true);
   for (const u of SELFTEST.urls || []) downloader.add(u, SELFTEST.format || 'best');
   await new Promise((r) => setTimeout(r, SELFTEST.waitMs || 6000));
   if (SELFTEST.js) {
     const r = await win.webContents.executeJavaScript(SELFTEST.js);
     if (r !== undefined) fs.writeFileSync(`${SELFTEST.shot}.txt`, JSON.stringify(r));
   }
-  await new Promise((r) => setTimeout(r, 600));
+  await new Promise((r) => setTimeout(r, SELFTEST.afterMs || 600));
   fs.writeFileSync(`${SELFTEST.shot}.items.json`, JSON.stringify(downloader.list().map((i) => ({ url: i.url, title: i.title, status: i.status, error: i.error }))));
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
@@ -201,9 +262,11 @@ if (gotLock) {
     app.setAppUserModelId('cl.hugo.descargador');
     loadSettings();
     createDownloader();
+    createUpdater();
     registerIpc();
     createWindow();
     if (!SELFTEST || SELFTEST.watch) startClipboardWatch();
+    if (!SELFTEST) scheduleUpdateChecks();
     if (SELFTEST) runSelftest();
   });
   app.on('before-quit', () => {

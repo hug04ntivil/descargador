@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
   embedMetadata: true,
   embedThumbnail: false,
   clipboardWatch: true,
+  autoUpdateCheck: true,
 };
 
 const ACTIVE = new Set(['downloading', 'processing']);

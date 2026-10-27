@@ -6,6 +6,9 @@ const pkg = require('../package.json');
 
 const root = path.join(__dirname, '..');
 
+// Rutas (relativas a la raíz del proyecto) que se empaquetan dentro de app.asar.
+const KEEP = [/^\/package\.json$/, /^\/src(\/|$)/, /^\/build$/, /^\/build\/icon\.ico$/, /^\/node_modules(\/|$)/];
+
 (async () => {
   for (const f of ['bin/yt-dlp.exe', 'bin/ffmpeg.exe', 'build/icon.ico']) {
     if (!fs.existsSync(path.join(root, f))) throw new Error(`Falta ${f}`);
@@ -24,14 +27,13 @@ const root = path.join(__dirname, '..');
     // koffi (lectura del número de secuencia del portapapeles) trae un .node que debe quedar fuera del asar.
     asar: { unpack: '*.node' },
     extraResource: [path.join(root, 'bin')],
-    ignore: [
-      /^\/(out|installer|test|bin|\.claude|graphify-out)(\/|$)/,
-      /^\/build\/(make-icon|package|installer)\.js$/,
-      /^\/build\/icon\.png$/,
-      /^\/node_modules\/koffi\/(doc|vendor|lib)(\/|$)/,
-      /^\/\.gitignore$/,
-      /^\/package-lock\.json$/,
-    ],
+    // Lista de lo que SÍ va dentro de la app: así carpetas del proyecto como android/ o .android-tools/
+    // (varios GB) nunca se cuelan en el instalador de Windows.
+    ignore: (file) => {
+      if (file === '') return false;
+      if (/^\/node_modules\/koffi\/(doc|vendor|lib)(\/|$)/.test(file)) return true;
+      return !KEEP.some((re) => re.test(file));
+    },
     win32metadata: {
       CompanyName: 'Hugo',
       FileDescription: 'Descargador de videos y audio',

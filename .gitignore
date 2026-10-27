@@ -3,6 +3,8 @@ node_modules/
 out/
 installer/*.exe
 installer/*.apk
+installer/*.sha256
+installer/notes-*.md
 
 # Binarios de terceros (yt-dlp.exe, ffmpeg.exe): se descargan, no se versionan
 bin/

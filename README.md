@@ -22,6 +22,32 @@ npm run dist                             # empaqueta e instala: installer/Descar
 ```
 `bin/` debe contener `yt-dlp.exe` y `ffmpeg.exe` (no se versionan).
 
+## Guardar cambios y publicar versiones
+Repositorio: <https://github.com/hug04ntivil/descargador> (rama `main`).
+
+**Día a día**: edita, prueba con `npm start` y guarda en GitHub:
+```
+git add -A
+git commit -m "Qué cambié"
+git push
+```
+
+**Publicar una versión nueva** (compila el instalador, lo sube a GitHub Releases y las apps instaladas avisan solas):
+```
+npm run release -- patch      # 1.1.0 -> 1.1.1  (correcciones)
+npm run release -- minor      # 1.1.0 -> 1.2.0  (funciones nuevas)
+npm run release -- major      # 1.1.0 -> 2.0.0
+```
+Antes hay que tener todo guardado con `git commit`. Opciones: `--draft` (crea el release como borrador para revisarlo),
+`--dry-run` (compila sin tocar git ni GitHub), `--notes "texto"` (novedades; por defecto se usan los mensajes de commit).
+El script comprueba que estés en `main`, que `gh` use la cuenta `hug04ntivil`, actualiza yt-dlp, compila, crea el commit
+`Versión X.Y.Z` con su etiqueta `vX.Y.Z`, sube todo y publica `Descargador-Setup-X.Y.Z.exe` con su suma SHA-256.
+
+**Cómo se actualizan las apps instaladas**: 15 s después de abrir (y cada 12 h) consultan el último release; si hay uno más
+nuevo muestran un aviso con **Instalar ahora**. Descarga el instalador desde `github.com/hug04ntivil/descargador/releases`,
+verifica su SHA-256, lo ejecuta en silencio y vuelve a abrir la app. Se puede desactivar en Preferencias. Las pruebas del
+actualizador: `npm run test:updater`.
+
 ## Android
 La misma interfaz corre en Android (`android/`): Kotlin + WebView + [youtubedl-android](https://github.com/JunkFood02/youtubedl-android)
 (Python, yt-dlp, ffmpeg y QuickJS dentro del APK). Guía de instalación y uso en [GUIA-ANDROID.md](GUIA-ANDROID.md).

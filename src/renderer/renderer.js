@@ -232,6 +232,7 @@ function openSettings() {
   $('s-playlists').value = settings.playlists;
   $('s-cookiesfile').value = settings.cookiesFile || '';
   $('s-clip').checked = settings.clipboardWatch;
+  $('s-autoupd').checked = settings.autoUpdateCheck !== false;
   $('s-meta').checked = settings.embedMetadata;
   $('s-thumb').checked = settings.embedThumbnail;
   $('s-subs').checked = settings.subtitles;
@@ -258,6 +259,7 @@ $('settings-form').addEventListener('submit', async (e) => {
     playlists: $('s-playlists').value,
     cookiesFile: $('s-cookiesfile').value,
     clipboardWatch: $('s-clip').checked,
+    autoUpdateCheck: $('s-autoupd').checked,
     embedMetadata: $('s-meta').checked,
     embedThumbnail: $('s-thumb').checked,
     subtitles: $('s-subs').checked,
@@ -370,6 +372,49 @@ $('p-filter').addEventListener('input', (e) => {
 $('picker').addEventListener('close', () => { if (!$('picker').open) picker.id = null; });
 window.api.onChoose((ch) => { choices.set(ch.id, ch); if (!$('picker').open) openPicker(ch.id); });
 
+// ---------- actualizaciones de la app (solo escritorio) ----------
+const banner = { version: '' };
+function showUpdate(info) {
+  banner.version = info.latest;
+  $('update-text').textContent = `Hay una versión nueva de Descargador: ${info.latest} (tienes la ${info.current}).`;
+  $('update-install').disabled = false;
+  $('update-install').textContent = 'Instalar ahora';
+  $('update-banner').hidden = false;
+}
+if (window.api.onUpdate) {
+  window.api.onUpdate(showUpdate);
+  window.api.onUpdateProgress((p) => {
+    $('update-text').textContent = p == null ? 'Descargando la actualización…' : `Descargando la actualización… ${Math.round(p * 100)} %`;
+    if (p === 1) $('update-text').textContent = 'Instalando… Descargador se reiniciará solo.';
+  });
+  window.api.onUpdateError((msg) => {
+    $('update-text').textContent = `No se pudo actualizar: ${msg}`;
+    $('update-install').disabled = false;
+    $('update-install').textContent = 'Reintentar';
+  });
+  $('update-install').addEventListener('click', () => {
+    $('update-install').disabled = true;
+    $('update-text').textContent = 'Descargando la actualización…';
+    window.api.installUpdate();
+  });
+  $('update-notes').addEventListener('click', () => window.api.openRelease());
+  $('update-later').addEventListener('click', () => {
+    window.api.dismissUpdate(banner.version);
+    $('update-banner').hidden = true;
+  });
+  $('s-appupdate').addEventListener('click', async () => {
+    const btn = $('s-appupdate');
+    btn.disabled = true;
+    btn.textContent = 'Buscando…';
+    const r = await window.api.checkAppUpdate();
+    btn.disabled = false;
+    btn.textContent = 'Buscar actualización';
+    if (r.status === 'latest') toast(`Ya tienes la última versión (${r.current}).`);
+    else if (r.status === 'error') toast(`No se pudo comprobar: ${r.message}`, 'error');
+    else $('settings').close();
+  });
+}
+
 // ---------- arranque ----------
 window.api.onItems((batch) => batch.forEach((it) => { items.set(it.id, it); render(it); }));
 window.api.onRemove((id) => {
@@ -389,6 +434,7 @@ window.api.onNotice((n) => toast(n.text, n.type));
   settings = init.settings;
   formats = init.formats;
   $('ytv').textContent = init.ytdlpVersion || '?';
+  $('appv').textContent = init.appVersion || '';
   fillFormats($('format'), settings.defaultFormat);
   init.items.sort((a, b) => a.addedAt - b.addedAt).forEach((it) => { items.set(it.id, it); render(it); });
   renderStats(init.stats);
