@@ -7,6 +7,7 @@ const on = (channel, cb) => {
 };
 
 contextBridge.exposeInMainWorld('api', {
+  platform: process.platform,
   init: () => ipcRenderer.invoke('init'),
   add: (text, format) => ipcRenderer.invoke('add', text, format),
   choiceConfirm: (id, indexes) => ipcRenderer.send('choice-confirm', id, indexes),

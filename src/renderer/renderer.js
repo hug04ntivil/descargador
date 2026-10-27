@@ -385,7 +385,11 @@ if (window.api.onUpdate) {
   window.api.onUpdate(showUpdate);
   window.api.onUpdateProgress((p) => {
     $('update-text').textContent = p == null ? 'Descargando la actualización…' : `Descargando la actualización… ${Math.round(p * 100)} %`;
-    if (p === 1) $('update-text').textContent = 'Instalando… Descargador se reiniciará solo.';
+    if (p === 1) {
+      $('update-text').textContent = window.api.platform === 'darwin'
+        ? 'Descarga lista: se abrió el instalador. Arrastra Descargador a Aplicaciones y reemplaza la versión anterior.'
+        : 'Instalando… Descargador se reiniciará solo.';
+    }
   });
   window.api.onUpdateError((msg) => {
     $('update-text').textContent = `No se pudo actualizar: ${msg}`;
@@ -428,6 +432,13 @@ window.api.onRemove((id) => {
 });
 window.api.onStats(renderStats);
 window.api.onNotice((n) => toast(n.text, n.type));
+
+if (window.api.platform === 'darwin') {
+  document.documentElement.classList.add('mac');
+  document.querySelectorAll('kbd').forEach((k) => { if (k.textContent === 'Ctrl') k.textContent = '⌘'; });
+  const sel = $('s-cookies');
+  if (sel && !sel.querySelector('option[value="safari"]')) sel.insertAdjacentHTML('beforeend', '<option value="safari">Safari</option>');
+}
 
 (async () => {
   const init = await window.api.init();

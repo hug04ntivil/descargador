@@ -13,6 +13,9 @@ function readTextSafe(ms = 3000) {
 }
 
 function loadSequenceFn() {
+  // GetClipboardSequenceNumber solo existe en Windows. En macOS se compara el texto del portapapeles
+  // (no detecta copiar otra vez exactamente el mismo enlace sin haber copiado nada distinto entre medias).
+  if (process.platform !== 'win32') return null;
   try {
     const koffi = require('koffi');
     const user32 = koffi.load('user32.dll');

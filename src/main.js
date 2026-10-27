@@ -19,6 +19,28 @@ if (!gotLock) app.quit();
 const WATCH_HOSTS = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com|dailymotion\.com|dai\.ly|facebook\.com|fb\.watch|fb\.com|soundcloud\.com|tiktok\.com|instagram\.com|instagr\.am|threads\.net|twitter\.com|x\.com|twitch\.tv|reddit\.com|redd\.it|bilibili\.com|vk\.com|rumble\.com|streamable\.com|kick\.com)$/i;
 
 const binDir = app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'bin');
+
+// En macOS el yt-dlp incluido vive dentro del .app (firmado, y de solo lectura si se abre desde el DMG).
+// Se usa una copia en la carpeta de datos del usuario para poder actualizarla con "yt-dlp -U".
+// Se vuelve a copiar solo cuando cambia la versión de la app. En Windows se usa bin\yt-dlp.exe tal cual.
+function prepareYtdlp() {
+  if (process.platform === 'win32') return undefined;
+  const bundled = path.join(binDir, 'yt-dlp');
+  const dest = path.join(app.getPath('userData'), 'bin', 'yt-dlp');
+  const stampFile = `${dest}.version`;
+  try {
+    const stamp = fs.existsSync(stampFile) ? fs.readFileSync(stampFile, 'utf8') : '';
+    if (!fs.existsSync(dest) || stamp !== app.getVersion()) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(bundled, dest);
+      fs.chmodSync(dest, 0o755);
+      fs.writeFileSync(stampFile, app.getVersion());
+    }
+    return dest;
+  } catch {
+    return bundled; // si no se puede copiar, se usa el incluido (no se podrá actualizar)
+  }
+}
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 const queueFile = () => path.join(app.getPath('userData'), 'queue.json');
 
@@ -107,6 +129,12 @@ function createUpdater() {
     tempDir: path.join(app.getPath('temp'), 'Descargador-update'),
     runInstaller: (file) => {
       if (dev && process.env.DESCARGADOR_UPDATE_DRYRUN) return;
+      if (process.platform === 'darwin') {
+        // La app no está firmada con un Developer ID: no se puede reemplazar sola. Se monta el DMG y el
+        // usuario arrastra Descargador a Aplicaciones (el DMG verificado queda en la carpeta temporal).
+        shell.openPath(file);
+        return;
+      }
       // El instalador cierra esta ventana, actualiza los archivos y vuelve a abrir la app (/RELAUNCH=1).
       const child = spawn(file, ['/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', '/RELAUNCH=1'], { detached: true, stdio: 'ignore' });
       child.unref();
@@ -128,7 +156,7 @@ function scheduleUpdateChecks() {
 }
 
 function createDownloader() {
-  downloader = new Downloader({ binDir, jsRuntime: process.execPath, getSettings: () => settings });
+  downloader = new Downloader({ binDir, ytdlpPath: prepareYtdlp(), jsRuntime: process.execPath, getSettings: () => settings });
   downloader.restore(readJson(queueFile(), []));
 
   const pending = new Map();
@@ -156,6 +184,7 @@ function createDownloader() {
     send('choose', choice);
     if (windowHidden()) {
       if (win && !win.isDestroyed()) win.flashFrame(true);
+      if (process.platform === 'darwin' && app.dock) app.dock.bounce('informational');
       osNotify('Lista detectada', `Elige qué videos descargar de «${choice.title}»`, showWindow);
     }
   });
@@ -251,11 +280,15 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  Menu.setApplicationMenu(null);
+  // macOS exige un menú: sin él no funcionan Cmd+C, Cmd+V ni Cmd+Q. En Windows no se muestra ninguno.
+  Menu.setApplicationMenu(process.platform === 'darwin'
+    ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
+    : null);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.on('focus', () => win.flashFrame(false));
+  win.on('closed', () => { win = null; });
 }
 
 async function runSelftest() {
@@ -264,7 +297,14 @@ async function runSelftest() {
   if (SELFTEST.minimize) win.minimize();
   if (SELFTEST.checkUpdate) checkForUpdate(true);
   for (const u of SELFTEST.urls || []) downloader.add(u, SELFTEST.format || 'best');
-  await new Promise((r) => setTimeout(r, SELFTEST.waitMs || 6000));
+  if (SELFTEST.untilDone) {
+    // Espera a que todas las descargas terminen (o fallen), con waitMs como límite.
+    const deadline = Date.now() + (SELFTEST.waitMs || 60000);
+    const finished = () => { const l = downloader.list(); return l.length > 0 && l.every((i) => ['done', 'error', 'canceled', 'choosing'].includes(i.status)); };
+    while (Date.now() < deadline && !finished()) await new Promise((r) => setTimeout(r, 500));
+  } else {
+    await new Promise((r) => setTimeout(r, SELFTEST.waitMs || 6000));
+  }
   if (SELFTEST.js) {
     const r = await win.webContents.executeJavaScript(SELFTEST.js);
     if (r !== undefined) fs.writeFileSync(`${SELFTEST.shot}.txt`, JSON.stringify(r));
@@ -302,5 +342,8 @@ if (gotLock) {
     downloader.shutdown();
     try { fs.writeFileSync(queueFile(), JSON.stringify(downloader.serialize())); } catch { /* ignorar */ }
   });
-  app.on('window-all-closed', () => app.quit());
+  // Windows/Linux: cerrar la ventana cierra la app. macOS: la app sigue viva (sigue vigilando el portapapeles
+  // y descargando) hasta Cmd+Q, y el icono del Dock vuelve a abrir la ventana.
+  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+  app.on('activate', () => { if (!win || win.isDestroyed()) createWindow(); else showWindow(); });
 }

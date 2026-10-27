@@ -14,8 +14,21 @@ assert.strictEqual(compareVersions('v1.10.0', '1.9.9'), 1);
 assert.strictEqual(compareVersions('1.1.0', 'v1.1.0'), 0);
 assert.strictEqual(compareVersions('1.0.9', '1.1.0'), -1);
 assert.strictEqual(compareVersions('basura', '1.1.0'), 0);
-assert.strictEqual(pickAsset({ assets: [{ name: 'notas.txt' }, { name: 'Descargador-Setup-1.2.0.exe' }] }).name, 'Descargador-Setup-1.2.0.exe');
-assert.strictEqual(pickAsset({ assets: [{ name: 'otro.exe' }] }), null);
+assert.strictEqual(pickAsset({ assets: [{ name: 'notas.txt' }, { name: 'Descargador-Setup-1.2.0.exe' }] }, 'win32', 'x64').name, 'Descargador-Setup-1.2.0.exe');
+assert.strictEqual(pickAsset({ assets: [{ name: 'otro.exe' }] }, 'win32', 'x64'), null);
+{
+  // macOS: cada procesador recibe su DMG; Windows ignora los DMG y Mac ignora el .exe
+  const rel = { assets: [
+    { name: 'Descargador-Setup-1.4.0.exe' },
+    { name: 'Descargador-1.4.0-mac-x64.dmg' },
+    { name: 'Descargador-1.4.0-mac-arm64.dmg' },
+    { name: 'Descargador-1.4.0-mac-arm64.dmg.sha256' },
+  ] };
+  assert.strictEqual(pickAsset(rel, 'darwin', 'arm64').name, 'Descargador-1.4.0-mac-arm64.dmg');
+  assert.strictEqual(pickAsset(rel, 'darwin', 'x64').name, 'Descargador-1.4.0-mac-x64.dmg');
+  assert.strictEqual(pickAsset(rel, 'win32', 'x64').name, 'Descargador-Setup-1.4.0.exe');
+  assert.strictEqual(pickAsset({ assets: [{ name: 'Descargador-Setup-1.4.0.exe' }] }, 'darwin', 'arm64'), null);
+}
 
 const installer = crypto.randomBytes(300 * 1024); // "instalador" falso
 const sha = crypto.createHash('sha256').update(installer).digest('hex');
@@ -53,7 +66,7 @@ function startServer(state) {
   let launched = null;
   const make = (current) => new Updater({
     currentVersion: current, repo: 'hug04ntivil/descargador', apiUrl: `${base}/api/latest`,
-    tempDir, runInstaller: (f) => { launched = f; }, allowAnyHost: true,
+    tempDir, runInstaller: (f) => { launched = f; }, allowAnyHost: true, platform: 'win32', arch: 'x64',
   });
 
   // Hay versión nueva

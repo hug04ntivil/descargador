@@ -35,3 +35,5 @@ graphify-out/
 *.log
 Thumbs.db
 .DS_Store
+installer/*.dmg
+installer/*.dmg.sha256

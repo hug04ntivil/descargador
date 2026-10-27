@@ -1,0 +1,88 @@
+name: Instaladores de macOS
+
+# Un Mac no se puede compilar ni firmar desde Windows, así que los DMG se construyen en los ejecutores macOS
+# de GitHub (gratis en repositorios públicos).
+#
+#  - Al publicar un release (npm run release), construye los DMG y los añade a ese mismo release.
+#  - A mano (pestaña Actions > Instaladores de macOS > Run workflow): los deja como artefactos para descargar
+#    y, si se indica una etiqueta (por ejemplo v1.4.0), también los sube a ese release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Etiqueta del release al que subir los DMG (vacío = solo guardarlos como artefactos)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # arm64 = Apple Silicon (M1/M2/M3/M4). x64 = Macs con procesador Intel.
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag != '' && inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Descargar yt-dlp y ffmpeg para macOS (${{ matrix.arch }})
+        run: node build/fetch-mac-bins.js --arch=${{ matrix.arch }}
+
+      - name: Pruebas del actualizador
+        run: node test/updater.test.js
+
+      - name: Empaquetar, firmar (ad-hoc) y crear el DMG
+        run: node build/dist-mac.js --arch=${{ matrix.arch }}
+
+      - name: Información de los binarios incluidos
+        continue-on-error: true
+        run: |
+          APP="out/Descargador-darwin-${{ matrix.arch }}/Descargador.app"
+          file "$APP/Contents/MacOS/Descargador" "$APP/Contents/Resources/bin/yt-dlp" "$APP/Contents/Resources/bin/ffmpeg"
+          codesign -dv "$APP" 2>&1 | head -8
+          du -sh "$APP"
+
+      # La prueba descarga un video pequeño y lo convierte a MP3: comprueba app + yt-dlp + ffmpeg + cola.
+      - name: Prueba de humo de la app (nativa, Apple Silicon)
+        if: matrix.arch == 'arm64'
+        run: node test/smoke-packaged.js "out/Descargador-darwin-arm64/Descargador.app/Contents/MacOS/Descargador"
+
+      - name: Prueba de humo de la app Intel (con Rosetta, si el ejecutor lo permite)
+        if: matrix.arch == 'x64'
+        continue-on-error: true
+        run: node test/smoke-packaged.js "out/Descargador-darwin-x64/Descargador.app/Contents/MacOS/Descargador" --rosetta
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Descargador-mac-${{ matrix.arch }}
+          path: installer/Descargador-*-mac-${{ matrix.arch }}.dmg*
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Subir al release
+        if: github.event_name == 'release' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          gh release upload "$TAG" \
+            installer/Descargador-*-mac-${{ matrix.arch }}.dmg \
+            installer/Descargador-*-mac-${{ matrix.arch }}.dmg.sha256 \
+            --repo "$GITHUB_REPOSITORY" --clobber

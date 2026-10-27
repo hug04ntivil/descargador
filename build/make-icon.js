@@ -85,3 +85,27 @@ const out = path.join(__dirname, 'icon.ico');
 fs.writeFileSync(out, Buffer.concat([head, ...dir, ...images]));
 fs.writeFileSync(path.join(__dirname, 'icon.png'), images[images.length - 1]);
 console.log('icono generado:', out);
+
+// ---- macOS: icon.icns (entradas PNG). Los iconos de macOS dejan ~10% de margen alrededor del dibujo. ----
+function renderPadded(size) {
+  const inner = Math.round(size * 0.8);
+  const small = render(inner);
+  const buf = Buffer.alloc(size * size * 4);
+  const off = Math.floor((size - inner) / 2);
+  for (let y = 0; y < inner; y++) small.copy(buf, ((y + off) * size + off) * 4, y * inner * 4, (y + 1) * inner * 4);
+  return buf;
+}
+const icnsTypes = [['icp4', 16], ['icp5', 32], ['icp6', 64], ['ic07', 128], ['ic08', 256], ['ic09', 512], ['ic10', 1024]];
+const icnsParts = icnsTypes.map(([type, s]) => {
+  const data = png(s, renderPadded(s));
+  const head = Buffer.alloc(8);
+  head.write(type, 0, 'ascii');
+  head.writeUInt32BE(data.length + 8, 4);
+  return Buffer.concat([head, data]);
+});
+const icnsBody = Buffer.concat(icnsParts);
+const icnsHead = Buffer.alloc(8);
+icnsHead.write('icns', 0, 'ascii');
+icnsHead.writeUInt32BE(icnsBody.length + 8, 4);
+fs.writeFileSync(path.join(__dirname, 'icon.icns'), Buffer.concat([icnsHead, icnsBody]));
+console.log('icono macOS generado:', path.join(__dirname, 'icon.icns'));

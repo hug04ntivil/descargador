@@ -19,6 +19,8 @@
     "release": "node build/release.js",
     "package": "node build/package.js",
     "installer": "node build/installer.js",
+    "test:smoke": "node test/smoke-packaged.js out/Descargador-win32-x64/Descargador.exe",
+    "dist:mac": "node build/fetch-mac-bins.js && node build/dist-mac.js",
     "dist": "npm run package && npm run installer"
   },
   "devDependencies": {

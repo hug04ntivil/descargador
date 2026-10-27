@@ -20,10 +20,17 @@ function compareVersions(a, b) {
   return 0;
 }
 
-const INSTALLER_RE = /^Descargador-Setup-[\w.-]+\.exe$/i;
+const WIN_RE = /^Descargador-Setup-[\w.-]+\.exe$/i;
+const MAC_RE = /^Descargador-[\w.]+-mac-(arm64|x64)\.dmg$/i;
 
-function pickAsset(release) {
-  return (release.assets || []).find((a) => INSTALLER_RE.test(a.name || '') && a.state !== 'uploading') || null;
+/** Windows: Descargador-Setup-X.exe. macOS: Descargador-X-mac-arm64.dmg o -x64.dmg según el procesador. */
+function pickAsset(release, platform = process.platform, arch = process.arch) {
+  const assets = (release.assets || []).filter((a) => a.state !== 'uploading');
+  if (platform === 'darwin') {
+    const want = arch === 'arm64' ? 'arm64' : 'x64';
+    return assets.find((a) => { const m = MAC_RE.exec(a.name || ''); return m && m[1].toLowerCase() === want; }) || null;
+  }
+  return assets.find((a) => WIN_RE.test(a.name || '')) || null;
 }
 
 class Updater extends EventEmitter {
@@ -42,6 +49,8 @@ class Updater extends EventEmitter {
     this.tempDir = opts.tempDir;
     this.runInstaller = opts.runInstaller;
     this.allowAnyHost = !!opts.allowAnyHost;
+    this.platform = opts.platform || process.platform;
+    this.arch = opts.arch || process.arch;
     this.pending = null;
   }
 
@@ -69,7 +78,7 @@ class Updater extends EventEmitter {
       const rel = await res.json();
       const latest = String(rel.tag_name || '').replace(/^v/, '');
       if (!parseVersion(latest)) throw new Error('La versión publicada no es válida');
-      const asset = pickAsset(rel);
+      const asset = pickAsset(rel, this.platform, this.arch);
       if (!asset || compareVersions(latest, this.currentVersion) <= 0) {
         this.pending = null;
         return { ...base, status: 'latest', latest };

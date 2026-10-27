@@ -127,7 +127,8 @@ class Downloader extends EventEmitter {
     this.items = new Map();
     this.procs = new Map();
     this.choices = new Map();
-    this.ytdlp = path.join(this.binDir, 'yt-dlp.exe');
+    // Windows: bin\yt-dlp.exe. macOS/Linux: bin/yt-dlp (o la copia escribible que indique main.js).
+    this.ytdlp = opts.ytdlpPath || path.join(this.binDir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
   }
 
   // ---------- utilidades ----------
@@ -441,7 +442,8 @@ class Downloader extends EventEmitter {
 
     let proc;
     try {
-      proc = spawn(this.ytdlp, this._buildArgs(item), { windowsHide: true, env: this._env() });
+      // En macOS/Linux el proceso va en su propio grupo para poder detener yt-dlp junto con ffmpeg.
+      proc = spawn(this.ytdlp, this._buildArgs(item), { windowsHide: true, env: this._env(), detached: process.platform !== 'win32' });
     } catch (e) {
       item.status = 'error';
       item.error = e.message;
@@ -543,7 +545,14 @@ class Downloader extends EventEmitter {
     const proc = this.procs.get(id);
     if (item) item._stop = reason;
     if (proc && proc.pid) {
-      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
+      } else {
+        // Se envía la señal a todo el grupo (yt-dlp y sus hijos); si no termina en 4 s, se fuerza.
+        const signal = (sig) => { try { process.kill(-proc.pid, sig); } catch { try { proc.kill(sig); } catch { /* ya terminó */ } } };
+        signal('SIGTERM');
+        setTimeout(() => { if (this.procs.get(id) === proc) signal('SIGKILL'); }, 4000).unref();
+      }
     } else if (item) {
       item._stop = null;
     }
