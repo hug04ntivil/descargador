@@ -76,6 +76,13 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      # Copia un enlace al portapapeles de macOS (pbcopy) y comprueba que la app lo añade sola.
+      # Va después de guardar los DMG y no bloquea el workflow: es informativa.
+      - name: Prueba del portapapeles (Apple Silicon)
+        if: matrix.arch == 'arm64'
+        continue-on-error: true
+        run: node test/smoke-clipboard.js "out/Descargador-darwin-arm64/Descargador.app/Contents/MacOS/Descargador"
+
       - name: Subir al release
         if: github.event_name == 'release' || inputs.tag != ''
         env:
