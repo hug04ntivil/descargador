@@ -195,6 +195,7 @@ function createDownloader() {
 
 function startClipboardWatch() {
   clipWatcher = watchClipboard((text) => {
+    if (SELFTEST && SELFTEST.debug) fs.appendFileSync(`${SELFTEST.shot}.clip.log`, `${Date.now()} detectado ${JSON.stringify(text.slice(0, 200))}\n`);
     for (const u of extractUrls(text)) {
       try {
         if (WATCH_HOSTS.test(new URL(u).hostname)) {

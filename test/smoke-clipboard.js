@@ -38,7 +38,7 @@ const ud = path.join(dir, 'datos');
 fs.mkdirSync(ud, { recursive: true });
 fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ outputDir: path.join(dir, 'descargas'), clipboardWatch: true, autoUpdateCheck: false, defaultFormat: '360' }));
 const shot = path.join(dir, 'captura.png');
-const cfg = { userData: ud, watch: true, urls: [], waitMs: 45000, shot };
+const cfg = { userData: ud, watch: true, debug: true, urls: [], waitMs: 45000, shot };
 
 const original = readClipboard();
 const child = spawn(exe, [], { env: { ...process.env, DESCARGADOR_SELFTEST: JSON.stringify(cfg) }, stdio: 'ignore' });
@@ -50,9 +50,16 @@ child.on('exit', () => {
     const itemsFile = `${shot}.items.json`;
     assert.ok(fs.existsSync(itemsFile), 'la app no llegó a escribir el resultado');
     const items = JSON.parse(fs.readFileSync(itemsFile, 'utf8'));
-    assert.ok(items.some((i) => i.url.includes('jNQXAC9IVRw')), `el enlace copiado no apareció en la cola (hay ${items.length} elementos)`);
+    const read = (f) => (fs.existsSync(`${shot}.${f}`) ? fs.readFileSync(`${shot}.${f}`, 'utf8') : '');
+    const detected = read('clip.log').includes('jNQXAC9IVRw');
+    const notifs = read('notifs.log').trim();
+    // El vigilante registra cada texto que detecta. Si la descarga falla (YouTube bloquea las IP de los servidores),
+    // la app retira el enlace de la lista y avisa con una notificación: por eso se mira el registro y no solo la cola.
+    assert.ok(detected, `el vigilante NO detectó el enlace copiado (cola: ${items.length} elementos; avisos: ${notifs || 'ninguno'})`);
     const it = items.find((i) => i.url.includes('jNQXAC9IVRw'));
-    console.log(`OK el portapapeles añadió el enlace solo → "${it.title}" [${it.status}]${it.error ? ' ' + it.error : ''}`);
+    console.log(`OK el vigilante detectó el enlace copiado. En la cola: ${it ? `"${it.title}" [${it.status}]` : 'nada (se retiró tras fallar el análisis)'}`);
+    if (notifs) console.log(`Avisos generados:
+${notifs}`);
     console.log('Prueba del portapapeles superada');
     fs.rmSync(dir, { recursive: true, force: true });
   } catch (e) {
